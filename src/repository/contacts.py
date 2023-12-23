@@ -6,12 +6,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import or_, and_, extract, cast, Date
 
-from src.entity.models import Contact
+from src.entity.models import Contact, User
 from src.schemas.contact import ContactSchema, ContactUpdate
 
 
-async def get_contacts(limit: int, offset: int, name: str, surname: str, email: str, db: AsyncSession):
-    statement = select(Contact).offset(offset).limit(limit)
+async def get_contacts(limit: int, offset: int, name: str, surname: str, email: str, db: AsyncSession,
+                       current_user: User):
+    statement = select(Contact).filter_by(user=current_user).offset(offset).limit(limit)
     if name:
         statement = statement.filter(Contact.name.ilike(f"%{name}%"))
     if surname:
@@ -24,16 +25,16 @@ async def get_contacts(limit: int, offset: int, name: str, surname: str, email: 
     return contacts.scalars().all()
 
 
-async def get_contact(contact_id: int, db: AsyncSession):
-    statement = select(Contact).filter_by(id=contact_id)
+async def get_contact(contact_id: int, db: AsyncSession, current_user: User):
+    statement = select(Contact).filter_by(id=contact_id, user=current_user)
     contact = await db.execute(statement)
     await db.close()
     return contact.scalar_one_or_none()
 
 
-async def create_contact(body: ContactSchema, db: AsyncSession):
+async def create_contact(body: ContactSchema, db: AsyncSession, current_user: User):
     try:
-        contact = Contact(**body.model_dump())
+        contact = Contact(**body.model_dump(), user=current_user)
         db.add(contact)
         await db.commit()
         await db.refresh(contact)
@@ -45,8 +46,8 @@ async def create_contact(body: ContactSchema, db: AsyncSession):
         await db.close()
 
 
-async def update_contact(contact_id: int, contact: ContactUpdate, db: AsyncSession):
-    statement = select(Contact).filter_by(id=contact_id)
+async def update_contact(contact_id: int, contact: ContactUpdate, db: AsyncSession, current_user: User):
+    statement = select(Contact).filter_by(id=contact_id, user=current_user)
     existing_contact = await db.execute(statement)
     existing_contact = existing_contact.scalar_one_or_none()
     if existing_contact:
@@ -58,8 +59,8 @@ async def update_contact(contact_id: int, contact: ContactUpdate, db: AsyncSessi
     return existing_contact
 
 
-async def delete_contact(contact_id: int, db: AsyncSession):
-    statement = select(Contact).filter_by(id=contact_id)
+async def delete_contact(contact_id: int, db: AsyncSession, current_user: User):
+    statement = select(Contact).filter_by(id=contact_id, user=current_user)
     contact = await db.execute(statement)
     contact = contact.scalar_one_or_none()
     if contact:
@@ -68,7 +69,7 @@ async def delete_contact(contact_id: int, db: AsyncSession):
         return contact
 
 
-async def get_upcoming_birthdays(db: AsyncSession):
+async def get_upcoming_birthdays(db: AsyncSession, current_user: User):
     today = date.today()
     next_week = today + timedelta(days=7)
 
@@ -83,7 +84,7 @@ async def get_upcoming_birthdays(db: AsyncSession):
                 extract('day', cast(Contact.birthday, Date)) <= extract('day', cast(next_week, Date))
             )
         )
-    )
+    ).filter_by(user=current_user)
 
     contacts = await db.execute(statement)
     await db.close()
