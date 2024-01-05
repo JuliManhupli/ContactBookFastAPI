@@ -23,6 +23,22 @@ conf = ConnectionConfig(
 
 
 async def send_email(email: EmailStr, username: str, host: str):
+    """
+    Send an email for email verification.
+
+    Args:
+        email (EmailStr): The recipient's email address.
+        username (str): The username of the user to whom the email is being sent.
+        host (str): The base URL of the application.
+
+    Raises:
+        ConnectionErrors: If there is an error connecting to the email server or sending the email.
+
+    Note:
+        This function generates an email verification token, constructs an email message with the verification link,
+        and sends the email using the FastMail service. If there is an issue with the email connection,
+        a ConnectionErrors exception is raised.
+    """
     try:
         token_verification = auth_service.create_email_token({"sub": email})
         message = MessageSchema(

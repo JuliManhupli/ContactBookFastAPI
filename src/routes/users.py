@@ -19,12 +19,40 @@ cloudinary.config(cloud_name=config.CLD_NAME, api_key=config.CLP_API_KEY, api_se
 
 @router.get("/me", response_model=UserResponse, dependencies=[Depends(RateLimiter(times=10, seconds=60))])
 async def get_current_user(current_user: User = Depends(auth_service.get_current_user)):
+    """
+    Retrieve details of the currently authenticated user.
+
+    Args:
+        current_user (User): The current authenticated user.
+
+    Returns:
+        UserResponse: The response containing details of the authenticated user.
+
+    Note:
+        The endpoint retrieves details of the currently authenticated user and returns them in the response.
+    """
     return current_user
 
 
 @router.patch("/avatar", response_model=UserResponse, dependencies=[Depends(RateLimiter(times=10, seconds=60))])
 async def update_avatar(file: UploadFile = File(), current_user: User = Depends(auth_service.get_current_user),
                         db: AsyncSession = Depends(get_db)):
+    """
+    Update the avatar of the currently authenticated user with the provided image file.
+
+    Args:
+        file (UploadFile): The image file to be used as the new avatar.
+        current_user (User): The current authenticated user.
+        db (AsyncSession): The asynchronous database session.
+
+    Returns:
+        UserResponse: The response containing details of the updated user with the new avatar.
+
+    Note:
+        The endpoint uploads the provided image file to Cloudinary, updates the avatar URL for the currently
+        authenticated user in the database, refreshes the user to get updated database state, and then returns
+        the details of the updated user. The user's information is also cached for 300 seconds.
+    """
     public_id = f"contact_book/{current_user.email}"
     res = cloudinary.uploader.upload(file.file, public_id=public_id, overwrite=True)
     res_url = cloudinary.CloudinaryImage(public_id).build_url(width=250, height=250, crop="fill",
